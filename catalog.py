@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Set, Dict, Iterable, Optional
+from typing import List, Dict, Iterable, Optional
 import pandas as pd
 
 
@@ -8,6 +8,7 @@ class Book:
     """
     Book. Frozen -> hashable -> can be placed into a set.
     """
+    id: str
     title: str
     author: str
     category: str
@@ -37,7 +38,7 @@ class Shelf:
         cats = ", ".join(sorted(self.categories())) or "-"
         lines = [f"Shelf '{self.name}' ({len(self.books)} books; categories: {cats})"]
         for b in self.books:
-            lines.append(f"  - {b.title} — {b.author} [{b.category}]")
+            lines.append(f"  - {b.title} — {b.author} [{b.category}] (id={b.id})")
         return "\n".join(lines)
 
 
@@ -62,7 +63,7 @@ class Catalog:
         self.room = room
 
     # STEP 1: place books by categories -> shelves
-    def organize_books_by_category(self, pile: Set[Book]) -> None:
+    def organize_books_by_category(self, pile: Iterable[Book]) -> None:
         if not self.room.shelves:
             raise ValueError("No shelves in the room.")
 
@@ -71,7 +72,7 @@ class Catalog:
         for b in pile:
             by_cat.setdefault(b.category, []).append(b)
 
-        # Determine category order
+        # Determine category order (stable/deterministic)
         categories = sorted(by_cat.keys(), key=str.lower)
 
         # Clear shelves before a new placement
@@ -108,13 +109,21 @@ class Catalog:
 
     def to_dataframe(self):
         """
-        Return a pandas. DataFrame with columns: title, author, category, shelf_name.
+        Return a pandas.DataFrame with columns: id, title, author, category, isbn, shelf_name.
         """
-
         rows = []
         for shelf in self.room.shelves:
             for b in shelf.books:
-                rows.append({"title": b.title, "author": b.author, "category": b.category, "shelf_name": shelf.name})
+                rows.append(
+                    {
+                        "id": b.id,
+                        "title": b.title,
+                        "author": b.author,
+                        "category": b.category,
+                        "isbn": b.isbn,
+                        "shelf_name": shelf.name,
+                    }
+                )
         return pd.DataFrame(rows)
 
 
@@ -122,16 +131,16 @@ def demo():
     # 1) Bob's room with a collection of shelves
     room = Room(owner="Bob", shelves=[Shelf("Left"), Shelf("Right"), Shelf("Top")])
 
-    # 2) start with a set of books
-    pile: Set[Book] = {
-        Book("A Tale of Two Cities", "Charles Dickens", "Classic"),
-        Book("Brave New World", "Aldous Huxley", "Dystopian"),
-        Book("The Pragmatic Programmer", "Andrew Hunt", "Programming"),
-        Book("Clean Code", "Robert C. Martin", "Programming"),
-        Book("Do Androids Dream of Electric Sheep?", "Philip K. Dick", "Sci-Fi"),
-        Book("I, Robot", "Isaac Asimov", "Sci-Fi"),
-        Book("The Name of the Rose", "Umberto Eco", "Mystery"),
-    }
+    # 2) start with a list of books
+    pile: List[Book] = [
+        Book("b001", "A Tale of Two Cities", "Charles Dickens", "Classic"),
+        Book("b002", "Brave New World", "Aldous Huxley", "Dystopian"),
+        Book("b003", "The Pragmatic Programmer", "Andrew Hunt", "Programming"),
+        Book("b004", "Clean Code", "Robert C. Martin", "Programming"),
+        Book("b005", "Do Androids Dream of Electric Sheep?", "Philip K. Dick", "Sci-Fi"),
+        Book("b006", "I, Robot", "Isaac Asimov", "Sci-Fi"),
+        Book("b007", "The Name of the Rose", "Umberto Eco", "Mystery"),
+    ]
 
     catalog = Catalog(room)
 
@@ -157,7 +166,7 @@ def demo():
         print("\nPivot (counts per shelf × category):")
         print(pivot)
     except RuntimeError:
-        pass  # pandas not installed — skip
+        pass 
 
 
 if __name__ == "__main__":
